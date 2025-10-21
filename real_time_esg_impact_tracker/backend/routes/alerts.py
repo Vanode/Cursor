@@ -342,7 +342,7 @@ def get_alerts_summary():
                 "critical_alerts": critical_alerts,
                 "warning_alerts": warning_alerts,
                 "alerts_by_company": [
-                    {"company": name, "count": count}
+                    {"company_name": name, "count": count}
                     for name, count in alerts_by_company
                 ]
             },

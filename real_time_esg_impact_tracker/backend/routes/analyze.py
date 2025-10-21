@@ -74,7 +74,7 @@ def analyze_company():
         
         return jsonify({
             "status": "success",
-            "company": company_name,
+            "company_name": company_name,
             "analysis": analysis_results,
             "ollama_insights": ollama_insights,
             "timestamp": datetime.utcnow().isoformat()
@@ -84,7 +84,7 @@ def analyze_company():
         return jsonify({
             "status": "error",
             "error": str(e),
-            "company": company_name
+            "company_name": company_name
         }), 500
 
 
@@ -273,7 +273,7 @@ def generate_report():
         else:
             return jsonify({
                 "status": "success",
-                "company": company_name,
+                "company_name": company_name,
                 "report": report,
                 "format": format_type,
                 "timestamp": datetime.utcnow().isoformat()
