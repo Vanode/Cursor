@@ -30,9 +30,11 @@ def create_app():
     # Register blueprints
     from backend.routes.analyze import analyze_bp
     from backend.routes.alerts import alerts_bp
+    from backend.routes.ml_features import ml_bp
     
     app.register_blueprint(analyze_bp, url_prefix='/api/analyze')
     app.register_blueprint(alerts_bp, url_prefix='/api/alerts')
+    app.register_blueprint(ml_bp, url_prefix='/api/ml')
     
     # Health check route
     @app.route('/health', methods=['GET'])
