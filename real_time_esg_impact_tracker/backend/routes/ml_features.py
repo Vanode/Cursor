@@ -365,7 +365,7 @@ def benchmark_company():
                     peer_score = ESGScore.query.filter_by(company_id=peer.id).order_by(ESGScore.created_at.desc()).first()
                     if peer_score:
                         peer_scores.append({
-                            "company": peer_name,
+                            "company_name": peer_name,
                             "e_score": peer_score.e_score,
                             "s_score": peer_score.s_score,
                             "g_score": peer_score.g_score,
