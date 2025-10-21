@@ -22,6 +22,15 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupEventListeners() {
     analyzeForm.addEventListener('submit', handleAnalyze);
     refreshBtn.addEventListener('click', loadInitialData);
+    
+    // Risk threshold slider
+    const riskThreshold = document.getElementById('riskThreshold');
+    const thresholdValue = document.getElementById('thresholdValue');
+    if (riskThreshold && thresholdValue) {
+        riskThreshold.addEventListener('input', (e) => {
+            thresholdValue.textContent = `(${parseFloat(e.target.value).toFixed(2)})`;
+        });
+    }
 }
 
 // Load initial data
@@ -65,27 +74,70 @@ async function handleAnalyze(e) {
     const companyName = companyNameInput.value.trim();
     if (!companyName) return;
     
+    // Get advanced settings
+    const riskThreshold = parseFloat(document.getElementById('riskThreshold')?.value || 0.3);
+    const maxArticles = parseInt(document.getElementById('maxArticles')?.value || 20);
+    const autoCreateAlerts = document.getElementById('autoCreateAlerts')?.checked || false;
+    
     setLoading(analyzeBtn, true);
     hideResult();
     
     try {
-        const response = await fetch(`${API_BASE_URL}/api/analyze/company`, {
+        // First, analyze the company
+        const analyzeResponse = await fetch(`${API_BASE_URL}/api/analyze/company`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ company_name: companyName })
+            body: JSON.stringify({ 
+                company_name: companyName,
+                max_articles: maxArticles
+            })
         });
         
-        const data = await response.json();
+        const analyzeData = await analyzeResponse.json();
         
-        if (response.ok) {
-            showResult(data, true);
-            await loadCompanies(); // Refresh companies list
-            updateAverageScores();
-        } else {
-            showResult(data, false);
+        if (!analyzeResponse.ok) {
+            showResult(analyzeData, false);
+            return;
         }
+        
+        // Then, detect risks with the specified threshold
+        const detectResponse = await fetch(`${API_BASE_URL}/api/alerts/detect`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                company_name: companyName,
+                threshold: riskThreshold,
+                auto_create: autoCreateAlerts
+            })
+        });
+        
+        const detectData = await detectResponse.json();
+        
+        // Show combined results
+        const resultMessage = `
+            <strong>Analysis Complete</strong><br>
+            ESG Scores calculated: ${analyzeData.analysis?.esg_scores ? 'Yes' : 'In Progress'}<br>
+            Risks detected: ${detectData.risks_detected || 0}<br>
+            Alerts created: ${detectData.alerts_created || 0}
+        `;
+        
+        showResult({ 
+            company_name: companyName, 
+            message: resultMessage,
+            risks: detectData.risks || []
+        }, true);
+        
+        // Refresh lists
+        await Promise.all([
+            loadCompanies(),
+            loadAlerts()
+        ]);
+        updateAverageScores();
+        
     } catch (error) {
         console.error('Analysis failed:', error);
         showResult({ error: 'Failed to connect to server. Please ensure the backend is running.' }, false);
@@ -97,17 +149,10 @@ async function handleAnalyze(e) {
 // Load companies
 async function loadCompanies() {
     try {
-        // For now, we'll fetch from the database through a custom endpoint
-        // Since we don't have a direct GET companies endpoint, we'll use the alert data
-        // In a production app, you'd want a dedicated companies endpoint
-        const response = await fetch(`${API_BASE_URL}/api/alerts/`);
-        const alerts = await response.json();
+        const response = await fetch(`${API_BASE_URL}/api/alerts/companies`);
+        const companies = await response.json();
         
-        // Get unique companies from alerts
-        const companyIds = [...new Set(alerts.map(alert => alert.company_id))];
-        
-        // Display placeholder companies or fetch from database
-        displayCompanies([]);
+        displayCompanies(companies);
         
     } catch (error) {
         console.error('Failed to load companies:', error);
@@ -118,87 +163,7 @@ async function loadCompanies() {
 // Display companies
 function displayCompanies(companies) {
     if (companies.length === 0) {
-        // Show sample companies for demo
-        companiesList.innerHTML = `
-            <div class="company-item">
-                <div class="company-header">
-                    <div>
-                        <div class="company-name">GreenTech Solutions</div>
-                    </div>
-                    <span class="company-industry">Technology</span>
-                </div>
-                <div class="esg-scores">
-                    <div class="score-item">
-                        <span class="score-label">Environmental</span>
-                        <span class="score-value environmental">85</span>
-                    </div>
-                    <div class="score-item">
-                        <span class="score-label">Social</span>
-                        <span class="score-value social">78</span>
-                    </div>
-                    <div class="score-item">
-                        <span class="score-label">Governance</span>
-                        <span class="score-value governance">92</span>
-                    </div>
-                    <div class="score-item">
-                        <span class="score-label">Overall</span>
-                        <span class="score-value overall">85</span>
-                    </div>
-                </div>
-            </div>
-            <div class="company-item">
-                <div class="company-header">
-                    <div>
-                        <div class="company-name">EcoEnergy Corp</div>
-                    </div>
-                    <span class="company-industry">Energy</span>
-                </div>
-                <div class="esg-scores">
-                    <div class="score-item">
-                        <span class="score-label">Environmental</span>
-                        <span class="score-value environmental">92</span>
-                    </div>
-                    <div class="score-item">
-                        <span class="score-label">Social</span>
-                        <span class="score-value social">88</span>
-                    </div>
-                    <div class="score-item">
-                        <span class="score-label">Governance</span>
-                        <span class="score-value governance">85</span>
-                    </div>
-                    <div class="score-item">
-                        <span class="score-label">Overall</span>
-                        <span class="score-value overall">88.3</span>
-                    </div>
-                </div>
-            </div>
-            <div class="company-item">
-                <div class="company-header">
-                    <div>
-                        <div class="company-name">SustainableFoods Inc</div>
-                    </div>
-                    <span class="company-industry">Food & Beverage</span>
-                </div>
-                <div class="esg-scores">
-                    <div class="score-item">
-                        <span class="score-label">Environmental</span>
-                        <span class="score-value environmental">72</span>
-                    </div>
-                    <div class="score-item">
-                        <span class="score-label">Social</span>
-                        <span class="score-value social">95</span>
-                    </div>
-                    <div class="score-item">
-                        <span class="score-label">Governance</span>
-                        <span class="score-value governance">80</span>
-                    </div>
-                    <div class="score-item">
-                        <span class="score-label">Overall</span>
-                        <span class="score-value overall">82.3</span>
-                    </div>
-                </div>
-            </div>
-        `;
+        companiesList.innerHTML = '<div class="empty-state">No companies tracked yet. Analyze a company to get started!</div>';
         return;
     }
     
@@ -277,12 +242,38 @@ function displayAlerts(alerts) {
 }
 
 // Update average scores
-function updateAverageScores() {
-    // For demo purposes, using sample data
-    document.getElementById('avgEnvironmental').textContent = '83.0';
-    document.getElementById('avgSocial').textContent = '87.0';
-    document.getElementById('avgGovernance').textContent = '85.7';
-    document.getElementById('avgOverall').textContent = '85.2';
+async function updateAverageScores() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/alerts/companies`);
+        const companies = await response.json();
+        
+        if (companies.length === 0) {
+            document.getElementById('avgEnvironmental').textContent = '--';
+            document.getElementById('avgSocial').textContent = '--';
+            document.getElementById('avgGovernance').textContent = '--';
+            document.getElementById('avgOverall').textContent = '--';
+            return;
+        }
+        
+        // Calculate averages from real data
+        let eSum = 0, sSum = 0, gSum = 0, oSum = 0;
+        let eCount = 0, sCount = 0, gCount = 0, oCount = 0;
+        
+        companies.forEach(company => {
+            if (company.e_score !== null) { eSum += company.e_score; eCount++; }
+            if (company.s_score !== null) { sSum += company.s_score; sCount++; }
+            if (company.g_score !== null) { gSum += company.g_score; gCount++; }
+            if (company.overall_score !== null) { oSum += company.overall_score; oCount++; }
+        });
+        
+        document.getElementById('avgEnvironmental').textContent = eCount > 0 ? (eSum / eCount).toFixed(1) : '--';
+        document.getElementById('avgSocial').textContent = sCount > 0 ? (sSum / sCount).toFixed(1) : '--';
+        document.getElementById('avgGovernance').textContent = gCount > 0 ? (gSum / gCount).toFixed(1) : '--';
+        document.getElementById('avgOverall').textContent = oCount > 0 ? (oSum / oCount).toFixed(1) : '--';
+        
+    } catch (error) {
+        console.error('Failed to update average scores:', error);
+    }
 }
 
 // Show analysis result

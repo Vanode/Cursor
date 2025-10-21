@@ -46,11 +46,8 @@ def get_alerts():
         
         alerts = query.all()
         
-        return jsonify({
-            "status": "success",
-            "count": len(alerts),
-            "alerts": [alert.to_dict() for alert in alerts]
-        }), 200
+        # Return array directly for frontend compatibility
+        return jsonify([alert.to_dict() for alert in alerts]), 200
         
     except Exception as e:
         return jsonify({
@@ -348,6 +345,47 @@ def get_alerts_summary():
             },
             "timestamp": datetime.utcnow().isoformat()
         }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
+
+
+@alerts_bp.route('/companies', methods=['GET'])
+def get_companies():
+    """
+    Get all companies with their latest ESG scores
+    """
+    try:
+        companies = Company.query.all()
+        
+        result = []
+        for company in companies:
+            # Get latest ESG score for the company
+            latest_score = ESGScore.query.filter_by(company_id=company.id)\
+                .order_by(ESGScore.created_at.desc()).first()
+            
+            company_data = company.to_dict()
+            if latest_score:
+                company_data.update({
+                    'e_score': latest_score.e_score,
+                    's_score': latest_score.s_score,
+                    'g_score': latest_score.g_score,
+                    'overall_score': latest_score.overall_score
+                })
+            else:
+                company_data.update({
+                    'e_score': None,
+                    's_score': None,
+                    'g_score': None,
+                    'overall_score': None
+                })
+            
+            result.append(company_data)
+        
+        return jsonify(result), 200
         
     except Exception as e:
         return jsonify({
