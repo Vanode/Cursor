@@ -3,7 +3,7 @@ Alert Management Routes
 ML-powered alert detection and management endpoints
 """
 from flask import Blueprint, jsonify, request
-from backend.database.models import Alert, Company
+from backend.database.models import Alert, Company, ESGScore
 from backend.app import db
 from backend.services.ml_analyzer import get_ml_analyzer
 from backend.services.data_collector import get_data_collector
